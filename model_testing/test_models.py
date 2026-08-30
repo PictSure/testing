@@ -7,7 +7,12 @@ Datasets are not committed to the repo - run download_datasets.sh first:
 
     ./model_testing/download_datasets.sh
     python3 model_testing/test_models.py
+
+The models are public, so no Hugging Face token is required, but providing
+one avoids anonymous rate limits. Set it via the HF_TOKEN environment
+variable, or run `huggingface-cli login` beforehand.
 """
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,12 +20,22 @@ from pathlib import Path
 from PIL import Image
 from PictSure import PictSure
 
-TOKEN = Path("/home/cornelius/.hf_credentials").read_text().strip()
+
+def resolve_hf_token() -> str | None:
+    token = os.environ.get("HF_TOKEN")
+    if token:
+        return token
+    cached = Path.home() / ".cache" / "huggingface" / "token"
+    if cached.exists():
+        return cached.read_text().strip()
+    return None
+
+
+TOKEN = resolve_hf_token()
 
 MODEL_IDS = [
     "pictsure/pictsure-vit",
     "pictsure/pictsure-resnet",
-    "pictsure/pictsure-resnet-base",
     "pictsure/pictsure-dinov2",
     "pictsure/pictsure-dinov2-large",
     "pictsure/pictsure-clip",

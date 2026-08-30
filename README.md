@@ -1,46 +1,66 @@
 # Testing of PictSure
 
-A working repo for validating and maintaining the model cards of the
-[PictSure](https://pictsure.eu/) model collection on Hugging Face
-([`pictsure/pictsure-10`](https://huggingface.co/collections/pictsure/pictsure-10)),
-plus a few models outside that collection (`pictsure-resnet-base`).
+An independent test harness for [PictSure](https://pictsure.eu/), a few-shot
+image classification method that uses in-context learning: you give the
+model a handful of labeled "context" images per class, and it classifies new
+images against those classes directly, with no fine-tuning or gradient
+updates. It works by combining a pre-trained image encoder (ViT, ResNet,
+DINOv2 or CLIP) with a transformer that attends over the context set, as
+described in
 
-PictSure is a few-shot image classification model that uses in-context
-learning: you give it a handful of labeled "context" images and it classifies
-new images against those classes, no fine-tuning required. See the
-[paper](https://arxiv.org/abs/2506.14842) and the
-[pictsure-library](https://github.com/PictSure/pictsure-library) for details.
+> Schiesser, L., Wolff, C., Haas, S., & Pukrop, S. (2025). *PictSure:
+> Pretraining Embeddings Matters for In-Context Learning Image Classifiers*.
+> [arXiv:2506.14842](https://arxiv.org/abs/2506.14842)
+
+The pre-trained models are published on Hugging Face as the
+[`pictsure/pictsure-10`](https://huggingface.co/collections/pictsure/pictsure-10)
+collection. Code and usage examples live in
+[pictsure-library](https://github.com/PictSure/pictsure-library).
+
+This repo validates that the usage pattern shown in each model's README
+actually works, for every published encoder, across multiple datasets and
+shot counts - not just the single example the docs happen to show.
 
 ## Layout
 
-- `repos/` - local clones of the Hugging Face model repos (`pictsure-vit`,
-  `pictsure-resnet`, `pictsure-dinov2`, `pictsure-clip`, `pictsure-dinov2-large`).
-  Used to review and push README updates. Note: this machine doesn't have
-  `git-lfs` installed, so `model.safetensors` in these clones is a pointer
-  file only, not the real weights - fine for editing docs, not for loading
-  the models directly from `repos/`.
-- `model_testing/` - a standalone harness that actually runs every model
-  through the few-shot classification usage pattern shown in its README,
-  across several datasets and shot counts, so README changes get validated
-  against real model behavior before being pushed live.
+- `repos/` - scratch space for local clones of the Hugging Face model repos,
+  used when reviewing or pushing README/model-card updates. Not committed
+  (see `.gitignore`) and not needed to run the tests below. If your local
+  `git` has no `git-lfs` installed, `model.safetensors` in these clones will
+  be a pointer file only, not the real weights - fine for editing docs, not
+  for loading the models directly from a clone.
+- `model_testing/` - the test harness itself: scripts to fetch datasets and
+  to run every model through the few-shot classification usage pattern from
+  its README, so doc changes get validated against real model behavior
+  before being published.
 
 ## Running the model tests
+
+Requires Python 3.11+, `torch`, `torchvision`, `transformers`, `Pillow`, and
+the [`PictSure`](https://pypi.org/project/PictSure/) package:
+
+```bash
+pip install torch torchvision transformers Pillow PictSure
+```
+
+Then:
 
 ```bash
 ./model_testing/download_datasets.sh   # fetches datasets into model_testing/datasets/ (gitignored)
 python3 model_testing/test_models.py
 ```
 
-`test_models.py` loads each model straight from the Hub (using the token in
-`~/.hf_credentials`) and runs it through `PictSure.from_pretrained(...)` ->
-`set_context_images(...)` -> `predict(...)`, exactly as documented in the
-model cards.
+`test_models.py` loads each model straight from the Hub and runs it through
+`PictSure.from_pretrained(...)` -> `set_context_images(...)` ->
+`predict(...)`, exactly as documented in the model cards. All models used
+here are public, so no Hugging Face token is required; if you hit anonymous
+rate limits, set the `HF_TOKEN` environment variable or run
+`huggingface-cli login` first.
 
 Models tested:
 
 - `pictsure/pictsure-vit`
 - `pictsure/pictsure-resnet`
-- `pictsure/pictsure-resnet-base`
 - `pictsure/pictsure-dinov2`
 - `pictsure/pictsure-dinov2-large`
 - `pictsure/pictsure-clip`
@@ -64,18 +84,18 @@ usage pattern works for every repo, not just `pictsure-vit`. Accuracy shown
 as percentage, with the exact correct/total count behind it; the best model
 per row is **bold** (ties all bolded):
 
-| Task | vit | resnet | resnet-base | dinov2 | dinov2-large | clip |
-|---|---|---|---|---|---|---|
-| CatsDogs (2-shot) | **100% (1/1)** | **100% (1/1)** | 0% (0/1) | **100% (1/1)** | **100% (1/1)** | **100% (1/1)** |
-| BrainTumor (1-shot) | 40% (8/20) | 50% (10/20) | 50% (10/20) | 45% (9/20) | 40% (8/20) | **60% (12/20)** |
-| BrainTumor (3-shot) | 70% (14/20) | 70% (14/20) | 40% (8/20) | 45% (9/20) | 50% (10/20) | **75% (15/20)** |
-| BrainTumor (5-shot) | 65% (13/20) | 50% (10/20) | 70% (14/20) | 45% (9/20) | 55% (11/20) | **85% (17/20)** |
-| BrainTumor (10-shot) | 70% (14/20) | 75% (15/20) | 55% (11/20) | **80% (16/20)** | **80% (16/20)** | **80% (16/20)** |
-| PlantDoc (1-shot) | 21% (8/38) | 18% (7/38) | 18% (7/38) | **39% (15/38)** | 24% (9/38) | 26% (10/38) |
-| PlantDoc (3-shot) | 21% (7/33) | 9% (3/33) | 27% (9/33) | 30% (10/33) | 30% (10/33) | **39% (13/33)** |
-| SwedishFlowers (1-shot) | 52% (13/25) | 24% (6/25) | 56% (14/25) | **100% (25/25)** | **100% (25/25)** | 84% (21/25) |
-| SwedishFlowers (3-shot) | 60% (15/25) | 20% (5/25) | 52% (13/25) | 96% (24/25) | **100% (25/25)** | 88% (22/25) |
-| SwedishFlowers (5-shot) | 67% (16/24) | 21% (5/24) | 54% (13/24) | 96% (23/24) | **100% (24/24)** | 92% (22/24) |
+| Task | vit | resnet | dinov2 | dinov2-large | clip |
+|---|---|---|---|---|---|
+| CatsDogs (2-shot) | **100% (1/1)** | **100% (1/1)** | **100% (1/1)** | **100% (1/1)** | **100% (1/1)** |
+| BrainTumor (1-shot) | 40% (8/20) | 50% (10/20) | 45% (9/20) | 40% (8/20) | **60% (12/20)** |
+| BrainTumor (3-shot) | 70% (14/20) | 70% (14/20) | 45% (9/20) | 50% (10/20) | **75% (15/20)** |
+| BrainTumor (5-shot) | 65% (13/20) | 50% (10/20) | 45% (9/20) | 55% (11/20) | **85% (17/20)** |
+| BrainTumor (10-shot) | 70% (14/20) | 75% (15/20) | **80% (16/20)** | **80% (16/20)** | **80% (16/20)** |
+| PlantDoc (1-shot) | 21% (8/38) | 18% (7/38) | **39% (15/38)** | 24% (9/38) | 26% (10/38) |
+| PlantDoc (3-shot) | 21% (7/33) | 9% (3/33) | 30% (10/33) | 30% (10/33) | **39% (13/33)** |
+| SwedishFlowers (1-shot) | 52% (13/25) | 24% (6/25) | **100% (25/25)** | **100% (25/25)** | 84% (21/25) |
+| SwedishFlowers (3-shot) | 60% (15/25) | 20% (5/25) | 96% (24/25) | **100% (25/25)** | 88% (22/25) |
+| SwedishFlowers (5-shot) | 67% (16/24) | 21% (5/24) | 96% (23/24) | **100% (24/24)** | 92% (22/24) |
 
 Takeaways:
 

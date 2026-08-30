@@ -8,14 +8,31 @@ Downloads two additional few-shot classification datasets for test_models.py:
 
 Called by download_datasets.sh - not meant to be run standalone against
 arbitrary datasets.
+
+A Hugging Face token is only used to avoid anonymous rate limits on the
+SwedishFlowers dataset; set it via the HF_TOKEN environment variable, or run
+`huggingface-cli login` beforehand. Both datasets are public.
 """
+import os
 import re
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 DATASET_DIR = Path(__file__).parent / "datasets"
-HF_TOKEN = Path("/home/cornelius/.hf_credentials").read_text().strip()
+
+
+def resolve_hf_token() -> str | None:
+    token = os.environ.get("HF_TOKEN")
+    if token:
+        return token
+    cached = Path.home() / ".cache" / "huggingface" / "token"
+    if cached.exists():
+        return cached.read_text().strip()
+    return None
+
+
+HF_TOKEN = resolve_hf_token()
 
 SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.(jpg|jpeg|JPG|JPEG)$")
 
