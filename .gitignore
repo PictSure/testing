@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# PictSure model testing: fetched via model_testing/download_datasets.sh
+model_testing/datasets/
+
+# Local clones of the PictSure Hugging Face model repos
+repos/
