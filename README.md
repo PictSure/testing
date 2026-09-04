@@ -23,15 +23,6 @@ shot counts - not just the single example the docs happen to show.
 
 ## Layout
 
-- `repos/` - scratch space for local clones of the Hugging Face model repos,
-  used when reviewing or pushing README/model-card updates. Not committed
-  (see `.gitignore`) and not needed to run the tests below. If your local
-  `git` has no `git-lfs` installed, `model.safetensors` in these clones will
-  be a pointer file only, not the real weights - fine for editing docs, not
-  for loading the models directly from a clone.
-- `model_testing/` - the test harness itself. One directory per dataset, plus
-  two top-level entry points that drive all of them:
-
 ```
 model_testing/
 ├── download_datasets.sh          # downloads every dataset (runs each download.py)
