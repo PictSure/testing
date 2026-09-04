@@ -217,8 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# PictSure model testing: fetched via model_testing/download_datasets.sh
-model_testing/datasets/
+# PictSure model testing: dataset images are fetched by each dataset's own
+# download.py (see model_testing/download_datasets.sh). The scripts stay in
+# git, the images they fetch do not.
+model_testing/datasets/*/data/
 
 # Local clones of the PictSure Hugging Face model repos
 repos/

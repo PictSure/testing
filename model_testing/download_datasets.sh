@@ -1,51 +1,52 @@
 #!/usr/bin/env bash
-# Downloads the few-shot image classification example datasets used by
-# test_models.py from the PictSure/pictsure-library GitHub repo.
+# Downloads the images for every dataset in this harness by running each
+# dataset's own download script under model_testing/datasets/<name>/.
 #
-# Datasets are NOT committed to this repo (see .gitignore) - run this
-# script whenever you need them locally:
+# Images are NOT committed to this repo (see .gitignore) - run this whenever
+# you need them locally:
 #
-#   ./model_testing/download_datasets.sh
-set -euo pipefail
+#   ./model_testing/download_datasets.sh                 # every dataset
+#   ./model_testing/download_datasets.sh beans dtd       # just these
+#
+# To fetch a single dataset directly, run its own script instead:
+#
+#   python3 model_testing/datasets/beans/download.py
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DATASET_DIR="$SCRIPT_DIR/datasets"
-BASE_URL="https://raw.githubusercontent.com/PictSure/pictsure-library/main/Examples"
+DATASETS_DIR="$SCRIPT_DIR/datasets"
+PYTHON="${PYTHON:-python3}"
 
-fetch() {
-  local url="$1" dest="$2"
-  if [ -f "$dest" ]; then
-    echo "skip (exists): $dest"
-    return
-  fi
-  echo "fetching: $dest"
-  curl -sf "$url" -o "$dest"
-}
-
-# --- CatsDogs: binary cat/dog classification ---
-mkdir -p "$DATASET_DIR/CatsDogs"
-for f in cat1.jpg cat2.jpg dog1.jpg dog2.jpg query.jpg; do
-  fetch "$BASE_URL/CatsDogs/$f" "$DATASET_DIR/CatsDogs/$f"
-done
-
-# --- BrainTumor_preprocessed: 4-way MRI tumor classification ---
-for cls in glioma meningioma notumor pituitary; do
-  mkdir -p "$DATASET_DIR/BrainTumor_preprocessed/$cls"
-  prefix="${cls:0:2}"
-  # Prefixes don't all match the first two letters (notumor -> "no", etc.)
-  case "$cls" in
-    glioma) prefix="gl" ;;
-    meningioma) prefix="me" ;;
-    notumor) prefix="no" ;;
-    pituitary) prefix="pi" ;;
-  esac
-  for i in $(seq -w 10 29); do
-    f="Te-${prefix}_00${i}.jpg"
-    fetch "$BASE_URL/BrainTumor_preprocessed/$cls/$f" "$DATASET_DIR/BrainTumor_preprocessed/$cls/$f"
+if [ "$#" -gt 0 ]; then
+  scripts=()
+  for name in "$@"; do
+    script="$DATASETS_DIR/$name/download.py"
+    if [ ! -f "$script" ]; then
+      echo "error: no such dataset '$name' (expected $script)" >&2
+      exit 2
+    fi
+    scripts+=("$script")
   done
+else
+  # Sorted so runs are reproducible; a dataset is just a directory with a
+  # download.py, so adding one needs no change here.
+  IFS=$'\n' read -r -d '' -a scripts < <(find "$DATASETS_DIR" -mindepth 2 -maxdepth 2 -name download.py | sort && printf '\0')
+fi
+
+failed=()
+for script in "${scripts[@]}"; do
+  name="$(basename "$(dirname "$script")")"
+  echo "=== $name ==="
+  if ! "$PYTHON" "$script"; then
+    echo "!!! $name failed" >&2
+    failed+=("$name")
+  fi
 done
 
-# --- PlantDoc (tomato leaf disease subset) and SwedishFlowers (wildflower subset) ---
-python3 "$SCRIPT_DIR/download_extra_datasets.py"
-
-echo "Done. Datasets are in $DATASET_DIR"
+echo
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "Done with errors. Failed dataset(s): ${failed[*]}" >&2
+  echo "Datasets that did download are usable; re-run to retry the rest."
+  exit 1
+fi
+echo "Done. ${#scripts[@]} dataset(s) downloaded under $DATASETS_DIR/<name>/data/"
